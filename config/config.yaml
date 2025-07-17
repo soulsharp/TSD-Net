@@ -1,0 +1,54 @@
+dataset_params:
+  im_path : 'dataset/data'
+  im_size : 224
+  im_channels : 3
+  classification_only : True
+  split_file_path : 'dataset/splits.json'
+  split_seed : 1222
+  
+tsd_params:
+  emb_dim : 128
+  num_encoder_layers_tiny : 2
+  num_encoder_layers_big : 6
+  num_heads_tiny : 2
+  num_heads_big : 4
+  cte_output_channels : 64
+  expansion_ratio : 2
+  
+train_params:
+  seed : 1111
+  task_name: 'classification_only'
+  train_batch_size : 32
+  val_batch_size : 16
+  val_split : 0.2
+  test_split : 0.1
+  warm_up_epochs : 10
+  train_epochs: 25
+  begin_train_epoch : 0
+  optimizer_name : "AdamW"
+  train_lr : 0.00001
+  train_wd : 0.01 # weight decay factor to be used in Adam and AdamW 
+  TRAIN_WITHOUT_WD : ['dw', 'bn', 'ln', 'bias'] # List of Layer names whose weight should not be decayed in AdamW 
+  pin_memory : True
+  num_workers : 4
+  amp_enabled :  True
+  clip_grad_norm : 1.0
+  compile_model : True
+  best_threshold : 0.35
+
+
+  # Config for checkpointing
+  tsd_ckpt_name: 'tsd_ckpt.pth'
+  AUTO_RESUME : True
+  TRAIN_CHECKPOINT : ''
+  checkpoint_dir : 'E:/ADTransformer/checkpoints'
+  
+  # Config for ReduceLROnPlateau
+  lr_scheduler_name : "ReduceLROnPlateau"
+  patience_epochs : 5
+  reduce_lr_factor : 0.1
+  loss_reduction_threshold : 1e-4
+  
+  # Config for CosineAnnealing Scheduler
+  eta_min : 1e-5
+  
