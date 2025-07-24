@@ -158,55 +158,6 @@ def build_dataloader(dataset, config, is_train):
 
     return data_loader
 
-def save_splits(split_dict, save_path):
-    with open(save_path, 'w') as f:
-        json.dump(split_dict, f)
-
-def load_splits(load_path):
-    with open(load_path, 'r') as f:
-        split_dict = json.load(f)
-    return {k: list(map(int, v)) for k, v in split_dict.items()}
-
-def split_dataset(im_dataset, train_config, split_file_path="dataset/splits.json", seed=42):
-    """
-    Splits a dataset into training, validation, and test sets using a fixed seed
-    and optionally saves/loads the split indices to/from disk.
-
-    Args:
-        im_dataset (Dataset): The full dataset to be split.
-        train_config (dict): Dictionary with "val_split" and "test_split" float values.
-        split_file_path (str): Path to a .json file for saving/loading split indices.
-        seed (int): Random seed for reproducibility.
-
-    Returns:
-        tuple: (train_dataset, val_dataset, test_dataset), each a Subset of im_dataset.
-    """
-    dataset_len = len(im_dataset)
-    val_size = int(dataset_len * train_config["val_split"])
-    test_size = int(dataset_len * train_config["test_split"])
-    train_size = dataset_len - val_size - test_size
-
-    if os.path.exists(split_file_path):
-        split_dict = load_splits(split_file_path)
-    else:
-        generator = torch.Generator().manual_seed(seed)
-        train_ds, val_ds, test_ds = random_split(
-            im_dataset, [train_size, val_size, test_size], generator=generator
-        )
-
-        split_dict = {
-            "train": train_ds.indices,
-            "val": val_ds.indices,
-            "test": test_ds.indices,
-        }
-        save_splits(split_dict, split_file_path)
-
-    train_dataset = Subset(im_dataset, split_dict["train"])
-    val_dataset = Subset(im_dataset, split_dict["val"])
-    test_dataset = Subset(im_dataset, split_dict["test"])
-
-    return train_dataset, val_dataset, test_dataset
-
 def _is_depthwise(module):
     """
     Check if a given module is a depthwise convolution layer.
@@ -313,11 +264,9 @@ def build_optimizer(config, model):
     
     return optimizer
 
-# Could possibly build custom criterions in the future for other training tasks
 def build_criterion():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    # criterion = nn.CrossEntropyLoss(weight=torch.tensor([1.0, 15.0]).to(device))
-    criterion = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([4.0]))
+    criterion = nn.CrossEntropyLoss().to(device)
     return criterion
 
 def build_lr_scheduler(config, optimizer, begin_epoch):
@@ -416,123 +365,12 @@ def compute_accuracy(preds: torch.Tensor, targets: torch.Tensor) -> float:
     Returns:
         float: Accuracy as a fraction between 0 and 1.
     """
-    # # Argmax to be used in case of multi-class classification
-    # predicted_labels = torch.argmax(preds, dim=1)
+    # Argmax to be used in case of multi-class classification
+    predicted_labels = torch.argmax(preds, dim=1)
     
-    # This works only in the case of binary classification
-    predicted_labels = preds > 0.35
     correct = (predicted_labels == targets).sum().item()
     total = targets.size(0)
     return correct / total
-
-def compute_f1_score(preds: torch.Tensor, targets: torch.Tensor):
-    """
-    Computes the precision, recall, and F1 score for binary classification.
-
-    Args:
-        preds (torch.Tensor): Predicted binary labels (0 or 1), of shape (N,).
-        targets (torch.Tensor): Ground-truth binary labels (0 or 1), of shape (N,).
-
-    Returns:
-        Tuple[float, float, float]: A tuple containing:
-            - precision (float): True positives / (True positives + False positives)
-            - recall (float): True positives / (True positives + False negatives)
-            - f1 (float): Harmonic mean of precision and recall
-    """
-    if preds.ndim == 2 and preds.shape[1] == 1:
-        preds = preds.squeeze(1)
-    
-    if targets.ndim == 2 and targets.shape[1] == 1:
-        targets = targets.squeeze(1)
-
-    preds = preds.int()
-    targets = targets.int()
-
-    assert preds.ndim == 1 and targets.ndim == 1, "Both inputs must be 1D tensors"
-    assert torch.all((preds == 0) | (preds == 1)), "Predictions must be binary (0 or 1)"
-    assert torch.all((targets == 0) | (targets == 1)), "Targets must be binary (0 or 1)"
-    
-    tp = (preds * targets).sum()
-    fp = (preds * (1 - targets)).sum()
-    fn = ((1 - preds) * targets).sum()
-    
-    epsilon = float(1e-8)
-    precision = tp / (tp + fp + epsilon)
-    recall = tp / (tp + fn + epsilon)
-    f1 = 2 * precision * recall / (precision + recall + epsilon)
-    
-    return precision.item(), recall.item(), f1.item()
-
-@torch.no_grad
-def test(test_loader, model, criterion, threshold):
-    """
-    Runs final evaluation of a trained model on the test set using a fixed threshold.
-
-    This function:
-        - Computes loss, accuracy, precision, recall, and F1 score.
-        - Applies a fixed threshold to logits for binary classification.
-        - Assumes the model is already trained and uses no gradient tracking.
-
-    Args:
-        test_loader (DataLoader): DataLoader for the test set.
-        model (nn.Module): Trained model to evaluate.
-        criterion (nn.Module): Loss function used to compute evaluation loss.
-        threshold (float): Threshold for converting logits to binary predictions.
-
-    Returns:
-        tuple: A 5-tuple containing:
-            - avg_loss (float): Mean loss over all test batches.
-            - avg_accuracy (float): Mean accuracy.
-            - precision (float): Precision over the full test set.
-            - recall (float): Recall over the full test set.
-            - f1 (float): F1 score over the full test set.
-    """
-
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model.eval()
-    all_preds = []
-    all_targets = []
-
-    batch_time = AverageMeter()
-    losses = AverageMeter()
-    val_accuracy = AverageMeter()
-
-    end = time.time()
-    for batch in test_loader:
-        x = batch["image"].to(device)
-        y = batch["label"].to(device).float()
-
-        outputs = model(x, return_logits=True)
-
-        #Squeeze applied for BCE consistency
-        outputs = outputs.squeeze(1)
-        loss = criterion(outputs, y)
-        losses.update(loss.item(), x.size(0))
-
-        # preds = torch.argmax(outputs, dim=1)
-        preds = outputs > threshold
-        acc = compute_accuracy(outputs, y)
-        val_accuracy.update(acc, x.size(0))
-
-        all_preds.append(preds.cpu())
-        all_targets.append(y.cpu())
-
-        batch_time.update(time.time() - end)
-        end = time.time()
-
-    all_preds = torch.cat(all_preds)
-    all_targets = torch.cat(all_targets)
-
-    p, r, f = compute_f1_score(all_preds, all_targets)
-
-    print(
-        f"Avg_time per batch : {batch_time.avg:.3f}s\n"
-        f"Avg Loss: {losses.avg:.3f}\n"
-        f"Avg Accuracy: {val_accuracy.avg:.3f}\n"
-        f"Precision: {p:.3f}, Recall: {r:.3f}, F1: {f:.3f}"
-    )
-
-    return losses.avg, val_accuracy.avg, p, r, f
 
 @torch.no_grad
 def validate_model(val_loader, device, model, criterion):
@@ -571,26 +409,11 @@ def validate_model(val_loader, device, model, criterion):
     logits = torch.cat(logits)
     targets = torch.cat(targets) 
 
-    thresholds = torch.arange(0.1, 0.91, 0.05)
-    f1_scores = []
-    precision_scores = []
-    recall_scores = []
-
-    for t in thresholds:
-        preds = (logits > t)
-        p, r, f1 = compute_f1_score(preds, targets)
-        f1_scores.append(f1)
-        precision_scores.append(p)
-        recall_scores.append(r)
-    
-    max_f1_idx = np.argmax(f1_scores)
-    max_precision = precision_scores[max_f1_idx]
-    max_recall = recall_scores[max_f1_idx]
-    max_f1 = f1_scores[max_f1_idx]
+    acc = compute_accuracy(logits, targets)
 
     print(
-        f"Avg Loss: {losses.avg:.3f}\n"
-        f"Precision: {max_precision:.3f}, Recall: {max_recall:.3f}, F1: {max_f1:.3f}"
+        f"Avg Loss : {losses.avg:.3f}\n"
+        f"Validation_accuracy : {acc:.3f}"
     )
     
-    return max_f1, thresholds[max_f1_idx].item(), losses.avg
+    return  losses.avg, acc
