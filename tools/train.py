@@ -8,12 +8,12 @@ import numpy as np
 import pprint
 
 from torchvision.utils import make_grid
-from dataset.dataset import DatasetFromFolder
+from data.dataset import prepare_cifar10_dataset
 from model.classifier import TSD_Classifier
 from utils.utils import load_yaml, split_dataset
 from utils.utils import resume_checkpoint, save_best_model, save_checkpoint, AverageMeter
 from utils.utils import build_dataloader, build_criterion, build_optimizer, build_lr_scheduler
-from utils.utils import compute_accuracy, step_scheduler, test, validate_model
+from utils.utils import compute_accuracy, step_scheduler, validate_model
 from torch import GradScaler
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -151,13 +151,9 @@ def train(args):
     if train_config.get("compile_model", True):
         model = torch.compile(model, mode="reduce-overhead")
     
-    im_dataset = DatasetFromFolder(dataset_config["im_path"], dataset_config["classification_only"])
-    train_dataset, val_dataset, _ = split_dataset(im_dataset, train_config,
-                                                dataset_config["split_file_path"], dataset_config["split_seed"])
+    train_dataset, val_dataset = prepare_cifar10_dataset(dataset_config)
 
     best_perf = 0.0
-    best_threshold = 0.35
-    better_model = True
     begin_epoch = train_config["begin_train_epoch"]
     num_epochs = train_config["train_epochs"]
     optimizer = build_optimizer(train_config, model)
@@ -183,27 +179,19 @@ def train(args):
         print(f"End of training epoch {epoch}.Took {(time.time() - start_time):.3f}s")
         
         print("Starting validation...")
-        best_f1_epoch, best_thresh_f1, best_val_loss = validate_model(val_loader, device, model, criterion)
+        val_loss, acc = validate_model(val_loader, device, model, criterion)
         
-        if best_f1_epoch > best_perf:
-            best_perf = best_f1_epoch
-            best_threshold = best_thresh_f1
+        if acc > best_perf:
+            best_perf = acc
             save_best_model(model, best_model_path)
 
-        print(f"Current epoch F1: {best_f1_epoch:.3f}, Best F1: {best_perf:.3f}, Best threshold: {best_threshold:.2f}")
+        print(f"Current epoch acc: {acc:.3f}, Best acc: {best_perf:.3f}")
         
-        step_scheduler(lr_scheduler, best_val_loss)
+        step_scheduler(lr_scheduler, val_loss)
 
         save_checkpoint(model, optimizer, checkpoint_save_path, epoch, best_perf)
               
     print("End of training...")
-
-    config['train_params']['best_threshold'] = round(best_threshold, 3)
-
-    with open(args.config_path, 'w') as f:
-        yaml.dump(config, f)
-    
-    print(f"Best threshold ({best_threshold:.3f}) saved to config file: {args.config_path}")
         
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Arguments for TSD classifier training')
