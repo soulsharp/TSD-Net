@@ -5,7 +5,16 @@ dataset_params:
   classification_only : True
   split_file_path : 'dataset/splits.json'
   split_seed : 1222
-  
+  mean : [0.485, 0.456, 0.406]
+  std  : [0.229, 0.224, 0.225]
+  interpolation_mode : BICUBIC
+
+  # Color jitter params
+  cj_brightness : 0.4
+  cj_contrast : 0.4
+  cj_saturation : 0.4
+  cj_hue : 0.1
+ 
 tsd_params:
   emb_dim : 128
   num_encoder_layers_tiny : 2
@@ -20,8 +29,6 @@ train_params:
   task_name: 'classification_only'
   train_batch_size : 32
   val_batch_size : 16
-  val_split : 0.2
-  test_split : 0.1
   warm_up_epochs : 10
   train_epochs: 25
   begin_train_epoch : 0
@@ -33,7 +40,7 @@ train_params:
   num_workers : 4
   amp_enabled :  True
   clip_grad_norm : 1.0
-  compile_model : True
+  compile_model : False
   best_threshold : 0.35
 
 
