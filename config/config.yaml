@@ -44,9 +44,9 @@ train_params:
 
   # Config for checkpointing
   tsd_ckpt_name: 'tsd_ckpt.pth'
-  AUTO_RESUME : True
+  AUTO_RESUME : False
   TRAIN_CHECKPOINT : ''
-  checkpoint_dir : 'E:/ADTransformer/checkpoints'
+  checkpoint_dir : 'checkpoints'
   
   # Config for ReduceLROnPlateau
   lr_scheduler_name : "ReduceLROnPlateau"
