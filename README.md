@@ -9,9 +9,9 @@ For more details, please refer the [paper](https://ieeexplore.ieee.org/document/
 *Figure 1: Overall architecture of TSD-Net.*
 
 This repo contains code for training the TSD-T(TSD-Tiny) and TSD-B(TSD-Big) variants on the CIFAR-10 Dataset.The training logic can be customized to train on other datasets and the training parameters and the model parameters can be easily modified using the config/config.yaml file.
-There is also support for model checkpointing, in order to enable it, the users need only create a checkpoints folder and two subfolders 'latest' and 'best' inside it to store the latest and the best versions of teh model, respectively during training
+There is also support for model checkpointing. In order to enable it, the users need only create a checkpoints folder and two subfolders 'latest' and 'best' inside it to store the latest and the best versions of the model, respectively during training.
 
-There is also support to auto-resume training from a checkpoint. You can set 'AUTO_RESUME' to True in the config.yaml file.By default, this auto-resumes training from the model inside checkpoints/latest but this can be tweaked by modifying utils.resume_checkpoint function and tools.train functions.
+There is also support to auto-resume training from a checkpoint. You can set 'AUTO_RESUME' to True in the config.yaml file. By default, this auto-resumes training from the model inside checkpoints/latest but this can be tweaked by modifying utils.resume_checkpoint function and tools.train functions.
 
 ## Steps
 
