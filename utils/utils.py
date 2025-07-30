@@ -56,7 +56,7 @@ def count_parameters(model):
     params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     return params/1000000
 
-def resume_checkpoint(model, optimizer, config, output_dir, which="latest"):
+def resume_checkpoint(model, optimizer, config, output_dir):
     """
     Loads model and optimizer state from a checkpoint, if available.
 
