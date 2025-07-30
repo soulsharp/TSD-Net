@@ -391,25 +391,25 @@ def validate_model(val_loader, device, model, criterion):
     """
     model.eval()
     logits = []
-    targets = []
+    all_targets = []
     losses = AverageMeter()
 
-    for batch in val_loader:
-        x = batch["image"].to(device)
-        y = batch["label"].to(device).float()
-        outputs = model(x, return_logits=True)
+    for (images,targets) in val_loader:
+        x = images.to(device)
+        y = targets.to(device)
+        outputs = model(x, return_logits=False)
 
-        #Squeeze applied for BCE consistency
-        outputs = outputs.squeeze(1)
+        # #Squeeze applied for BCE consistency
+        # outputs = outputs.squeeze(1)
         loss = criterion(outputs, y)
         losses.update(loss.item(), x.size(0))
         logits.append(outputs.cpu())
-        targets.append(y.cpu())
+        all_targets.append(y.cpu())
     
     logits = torch.cat(logits)
-    targets = torch.cat(targets) 
+    all_targets = torch.cat(all_targets) 
 
-    acc = compute_accuracy(logits, targets)
+    acc = compute_accuracy(logits, all_targets)
 
     print(
         f"Avg Loss : {losses.avg:.3f}\n"

@@ -7,14 +7,15 @@ import time
 import numpy as np
 import pprint
 
-from torchvision.utils import make_grid
 from data.dataset import prepare_cifar10_dataset
 from model.classifier import TSD_Classifier
-from utils.utils import load_yaml, split_dataset
+from utils.utils import load_yaml
 from utils.utils import resume_checkpoint, save_best_model, save_checkpoint, AverageMeter
 from utils.utils import build_dataloader, build_criterion, build_optimizer, build_lr_scheduler
-from utils.utils import compute_accuracy, step_scheduler, validate_model
+from utils.utils import compute_accuracy, step_scheduler, validate_model, count_parameters
 from torch import GradScaler
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -49,16 +50,15 @@ def train_one_epoch(config, train_loader, model, criterion, optimizer, epoch, sc
 
     print_frequency = len(train_loader) // 5
 
-    for i, batch in enumerate(train_loader):
+    for i, (images, targets) in enumerate(train_loader):
         data_time.update(time.time() - end)
 
-        x = batch["image"].to(device)
-        y = batch["label"].to(device)
-        y = y.view(-1, 1).float()
+        x = images.to(device)
+        y = targets.to(device)
 
         with torch.autocast(device.type, enabled=config["amp_enabled"]):
             # In multi-class classification return_logits is to be set to False
-            out = model(x, return_logits=True)
+            out = model(x, return_logits=False)
             loss = criterion(out, y)
 
         optimizer.zero_grad()
@@ -87,6 +87,7 @@ def train_one_epoch(config, train_loader, model, criterion, optimizer, epoch, sc
                 f"Loss: Current_batch = {losses.val:.3f}, Avg={losses.avg:.3f}\n"
                 f"Accuracy : Current_batch = {accuracy.val:.3f}, Avg={accuracy.avg:.3f}"
             )
+
 
 def train(args):
     """
@@ -147,7 +148,7 @@ def train(args):
                            tsd_config["expansion_ratio"], tsd_config["cte_output_channels"])
     
     model = model.to(device)
-
+    print(f"Num_parameters : {count_parameters(model)}M")
     if train_config.get("compile_model", True):
         model = torch.compile(model, mode="reduce-overhead")
     

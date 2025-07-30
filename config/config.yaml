@@ -27,7 +27,7 @@ tsd_params:
 train_params:
   seed : 1111
   task_name: 'classification_only'
-  train_batch_size : 32
+  train_batch_size : 16
   val_batch_size : 16
   warm_up_epochs : 10
   train_epochs: 25
@@ -41,8 +41,6 @@ train_params:
   amp_enabled :  True
   clip_grad_norm : 1.0
   compile_model : False
-  best_threshold : 0.35
-
 
   # Config for checkpointing
   tsd_ckpt_name: 'tsd_ckpt.pth'
