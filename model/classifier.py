@@ -1,7 +1,7 @@
 import torch
 from torch import nn
-from TSD_model.TSD import TSD_B, TSD_T
-from TSD_model.TSD_blocks import Mlp
+from model.TSD_model.TSD import TSD_B, TSD_T
+from model.TSD_model.TSD_blocks import Mlp
 
 from utils.utils import count_parameters
 
@@ -41,8 +41,7 @@ class TSD_Classifier(nn.Module):
         # self.backbone = TSD_T(dim, cte_out_channels, num_heads, num_encoder_layers, expansion_ratio)
 
         self.backbone = TSD_B(
-            dim, cte_out_channels, num_heads, num_encoder_layers, expansion_ratio
-        )
+            dim, cte_out_channels, num_heads, num_encoder_layers, expansion_ratio)
         self.pool = nn.AdaptiveAvgPool1d(1)
         if num_classes > 2:
             self.classifier = Mlp(
