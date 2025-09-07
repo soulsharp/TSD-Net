@@ -34,7 +34,7 @@ class TSD_T(nn.Module):
         return x
 
 class TSD_B(nn.Module):
-    def __init__(self, dim, cte_out_channels, num_encoder_layers=6, expansion_ratio=2):
+    def __init__(self, dim, cte_out_channels, num_encoder_layers=6, expansion_ratio=4):
         super(TSD_B, self).__init__()
         self.num_encoder_layers = num_encoder_layers
         self.cte_block = CTEBlock(cte_out_channels, dim)
