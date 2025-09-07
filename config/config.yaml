@@ -1,10 +1,7 @@
 dataset_params:
   im_path : 'dataset/data'
-  im_size : 224
+  im_size : 32
   im_channels : 3
-  classification_only : True
-  split_file_path : 'dataset/splits.json'
-  split_seed : 1222
   mean : [0.485, 0.456, 0.406]
   std  : [0.229, 0.224, 0.225]
   interpolation_mode : BICUBIC
@@ -22,29 +19,29 @@ tsd_params:
   num_heads_tiny : 2
   num_heads_big : 4
   cte_output_channels : 64
-  expansion_ratio : 2
+  expansion_ratio : 4
   
 train_params:
   seed : 1111
   task_name: 'classification_only'
-  train_batch_size : 16
+  train_batch_size : 32
   val_batch_size : 16
-  warm_up_epochs : 10
+  warm_up_epochs : 5
   train_epochs: 25
   begin_train_epoch : 0
   optimizer_name : "AdamW"
-  train_lr : 0.00001
+  train_lr : 0.0001
   train_wd : 0.01 # weight decay factor to be used in Adam and AdamW 
   TRAIN_WITHOUT_WD : ['dw', 'bn', 'ln', 'bias'] # List of Layer names whose weight should not be decayed in AdamW 
   pin_memory : True
-  num_workers : 4
+  num_workers : 2
   amp_enabled :  True
   clip_grad_norm : 1.0
-  compile_model : False
+  compile_model : True
 
   # Config for checkpointing
   tsd_ckpt_name: 'tsd_ckpt.pth'
-  AUTO_RESUME : False
+  AUTO_RESUME : True
   TRAIN_CHECKPOINT : ''
   checkpoint_dir : 'checkpoints'
   
