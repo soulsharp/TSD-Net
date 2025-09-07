@@ -36,36 +36,50 @@ def build_transforms(cfg, is_train=True):
     normalize = T.Normalize(mean=cfg["mean"], std=cfg["std"])
     transforms = None
 
-    if is_train:
-        crop = cfg["im_size"]
-        precrop = crop + 32
-        transforms = T.Compose([
-            T.Resize(
-                (precrop, precrop),
-                interpolation=InterpolationMode[cfg["interpolation_mode"]]
-            ),
-            T.RandomCrop((crop, crop)),
-            T.RandomHorizontalFlip(),
-            T.ColorJitter(
-                cfg.get("cj_brightness", 0.4),
-                cfg.get("cj_contrast", 0.4),
-                cfg.get("cj_saturation", 0.4),
-                cfg.get("cj_hue", 0.1),
-            ),
-            T.ToTensor(),
-            normalize,
-        ])
+    # if is_train:
+    #     crop = cfg["im_size"]
+    #     precrop = crop + 32
+    #     transforms = T.Compose([
+    #         T.Resize(
+    #             (precrop, precrop),
+    #             interpolation=InterpolationMode[cfg["interpolation_mode"]]
+    #         ),
+    #         T.RandomCrop((crop, crop)),
+    #         T.RandomHorizontalFlip(),
+    #         T.ColorJitter(
+    #             cfg.get("cj_brightness", 0.4),
+    #             cfg.get("cj_contrast", 0.4),
+    #             cfg.get("cj_saturation", 0.4),
+    #             cfg.get("cj_hue", 0.1),
+    #         ),
+    #         T.ToTensor(),
+    #         normalize,
+    #     ])
     
+    # else:
+    #     transforms = T.Compose([
+    #         T.Resize(
+    #             (cfg["im_size"], cfg["im_size"]),
+    #             interpolation=InterpolationMode[cfg["interpolation_mode"]]
+    #         ),
+    #         T.ToTensor(),
+    #         normalize
+    #         ])
+    
+    # Testing different augmentations
+    if is_train:
+        transforms = T.Compose([
+        T.RandomCrop(32, padding=4),
+        T.RandomHorizontalFlip(),
+        T.ToTensor(),
+        normalize,
+    ])
     else:
         transforms = T.Compose([
-            T.Resize(
-                (cfg["im_size"], cfg["im_size"]),
-                interpolation=InterpolationMode[cfg["interpolation_mode"]]
-            ),
-            T.ToTensor(),
-            normalize
-            ])
-    
+        T.ToTensor(),
+        normalize
+        ])
+
     return transforms
 
 def prepare_cifar10_dataset(cfg):
