@@ -130,13 +130,13 @@ def train(args):
     tsd_config = config['tsd_params']
     train_config = config['train_params']
 
-    # Sets the desired seed value
-    seed = train_config['seed']
-    torch.manual_seed(seed)
-    np.random.seed(seed)
-    random.seed(seed)
-    if device == 'cuda':
-        torch.cuda.manual_seed_all(seed)
+    # # Sets the desired seed value
+    # seed = train_config['seed']
+    # torch.manual_seed(seed)
+    # np.random.seed(seed)
+    # random.seed(seed)
+    # if device == 'cuda':
+    #     torch.cuda.manual_seed_all(seed)
 
     # model = TSD_Classifier(args.num_classes, tsd_config["emb_dim"], 
     #                        tsd_config["num_heads_tiny"], tsd_config["num_encoder_layers_tiny"],
@@ -159,18 +159,20 @@ def train(args):
     num_epochs = train_config["train_epochs"]
     optimizer = build_optimizer(train_config, model)
     
-    final_output_dir = train_config["checkpoint_dir"]
-    best_perf, begin_epoch = resume_checkpoint( model, optimizer, train_config, final_output_dir)
+    # Resumes training from a checkpoint
+    checkpoint_dir = train_config["checkpoint_dir"]
+    checkpoint_save_path = os.path.join(checkpoint_dir, "latest")
+    best_model_path = os.path.join(checkpoint_dir, "best")
 
+    best_perf, begin_epoch = resume_checkpoint(model, optimizer, train_config, checkpoint_save_path)
+    
+    # Builds dataloaders, criterion and scheduler
     train_loader = build_dataloader(train_dataset, train_config, is_train=True)
     val_loader = build_dataloader(val_dataset, train_config, is_train=False)
     criterion = build_criterion().to(device)
     lr_scheduler = build_lr_scheduler(train_config, optimizer, begin_epoch)
 
     scaler = GradScaler(device.type, enabled=train_config["amp_enabled"])
-
-    checkpoint_save_path = os.path.join(final_output_dir, "latest")
-    best_model_path = os.path.join(final_output_dir, "best")
     
     print("Start of training...")
     for epoch in range(begin_epoch, num_epochs):
