@@ -1,7 +1,8 @@
 import torch
 from torch import nn
-from .TSD_model.TSD import TSD_T, TSD_B
-from .TSD_model.TSD_blocks import Mlp
+from TSD_model.TSD import TSD_T, TSD_B
+from TSD_model.TSD_blocks import Mlp
+from utils.utils import count_parameters
 
 class TSD_Classifier(nn.Module):
     """
@@ -23,13 +24,13 @@ class TSD_Classifier(nn.Module):
             - If return_logits is False: class probabilities of shape (B, num_classes)
             - If return_logits is True: raw logits of shape (B, num_classes)
     """
-    def __init__(self, num_classes, dim=128, num_heads=2, num_encoder_layers=2, 
+    def __init__(self, num_classes, dim=128, num_heads=4, num_encoder_layers=4, 
                  expansion_ratio=2, cte_out_channels=64):
         super().__init__()
         self.num_classes = num_classes
-        self.backbone = TSD_T(dim, cte_out_channels, num_encoder_layers, expansion_ratio)
+        # self.backbone = TSD_T(dim, cte_out_channels, num_heads, num_encoder_layers, expansion_ratio)
         
-        # self.backbone = TSD_B(dim, cte_out_channels, num_encoder_layers, expansion_ratio)
+        self.backbone = TSD_B(dim, cte_out_channels, num_heads, num_encoder_layers, expansion_ratio)
         self.pool = nn.AdaptiveAvgPool1d(1)
         if(num_classes > 2):
             self.classifier = Mlp(in_features=dim, hidden_features=512, out_features=num_classes)
@@ -44,3 +45,7 @@ class TSD_Classifier(nn.Module):
         if return_logits:
             return logits
         return torch.softmax(logits, dim=1)
+
+if __name__ == "__main__":
+    model = TSD_Classifier(10)
+    print(count_parameters(model=model))
