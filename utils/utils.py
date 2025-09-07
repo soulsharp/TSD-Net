@@ -72,14 +72,15 @@ def resume_checkpoint(model, optimizer, config, output_dir):
     """
     best_perf = 0.0
     begin_epoch = 0
-
+   
     if not config["TRAIN_CHECKPOINT"]:
         checkpoint = os.path.join(output_dir, 'checkpoint.pth')
     else:
         checkpoint = config["TRAIN_CHECKPOINT"]
+        
+    print(f"Looking for a checkpoint at {checkpoint} ...")
 
     if config["AUTO_RESUME"] and os.path.exists(checkpoint):
-
         checkpoint_dict = torch.load(checkpoint, map_location='cpu')
         best_perf = checkpoint_dict['perf']
         begin_epoch = checkpoint_dict['epoch']
@@ -372,48 +373,26 @@ def compute_accuracy(preds: torch.Tensor, targets: torch.Tensor) -> float:
     total = targets.size(0)
     return correct / total
 
-@torch.no_grad
-def validate_model(val_loader, device, model, criterion):
-    """
-    Evaluates the model on the validation set using multiple thresholds to find the best F1-score.
-
-    Args:
-        val_loader (DataLoader): DataLoader for the validation dataset.
-        device (torch.device): Device to run inference on (CPU or CUDA).
-        model (torch.nn.Module): The model to evaluate. Must support return_logits=True if needed.
-        criterion (torch.nn.Module): Loss function used for evaluation.
-
-    Returns:
-        tuple:
-            - max_f1 (float): Maximum F1-score achieved across thresholds.
-            - best_threshold (float): Threshold value that yielded max F1-score.
-            - avg_loss (float): Average validation loss.
-    """
+@torch.no_grad()
+def validate_model(val_loader, device, model, criterion, amp_enabled=True):
     model.eval()
-    logits = []
-    all_targets = []
     losses = AverageMeter()
+    accuracy = AverageMeter()
 
-    for (images,targets) in val_loader:
-        x = images.to(device)
-        y = targets.to(device)
-        outputs = model(x, return_logits=False)
+    for images, targets in val_loader:
+        x = images.to(device, non_blocking=True)
+        y = targets.to(device, non_blocking=True)
 
-        # #Squeeze applied for BCE consistency
-        # outputs = outputs.squeeze(1)
-        loss = criterion(outputs, y)
+        with torch.autocast(device_type=device.type, enabled=amp_enabled):
+            outputs = model(x, return_logits=True)
+            loss = criterion(outputs, y)
+
         losses.update(loss.item(), x.size(0))
-        logits.append(outputs.cpu())
-        all_targets.append(y.cpu())
-    
-    logits = torch.cat(logits)
-    all_targets = torch.cat(all_targets) 
-
-    acc = compute_accuracy(logits, all_targets)
+        acc = compute_accuracy(outputs, y)
+        accuracy.update(acc, x.size(0))
 
     print(
-        f"Avg Loss : {losses.avg:.3f}\n"
-        f"Validation_accuracy : {acc:.3f}"
+        f"Avg Loss: {losses.avg:.3f}\n"
+        f"Validation Accuracy: {accuracy.avg:.3f}"
     )
-    
-    return  losses.avg, acc
+    return losses.avg, accuracy.avg
