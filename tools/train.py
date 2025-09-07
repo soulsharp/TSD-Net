@@ -1,23 +1,36 @@
-import yaml
 import argparse
-import torch
-import random
 import os
-import time
-import numpy as np
 import pprint
+import random
+import time
+
+import numpy as np
+import torch
+import yaml
+from torch import GradScaler
 
 from data.dataset import prepare_cifar10_dataset
 from model.classifier import TSD_Classifier
-from utils.utils import load_yaml
-from utils.utils import resume_checkpoint, save_best_model, save_checkpoint, AverageMeter
-from utils.utils import build_dataloader, build_criterion, build_optimizer, build_lr_scheduler
-from utils.utils import compute_accuracy, step_scheduler, validate_model, count_parameters
-from torch import GradScaler
+from utils.utils import (
+    AverageMeter,
+    build_criterion,
+    build_dataloader,
+    build_lr_scheduler,
+    build_optimizer,
+    compute_accuracy,
+    count_parameters,
+    load_yaml,
+    resume_checkpoint,
+    save_best_model,
+    save_checkpoint,
+    step_scheduler,
+    validate_model,
+)
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 def train_one_epoch(config, train_loader, model, criterion, optimizer, epoch, scaler):
     """
@@ -36,10 +49,10 @@ def train_one_epoch(config, train_loader, model, criterion, optimizer, epoch, sc
         optimizer (Optimizer): Optimizer to update model weights.
         epoch (int): Current epoch index (for logging).
         scaler (GradScaler): PyTorch GradScaler for AMP training.
-    
+
     Returns:
         tuple: (avg_loss, avg_accuracy) for the epoch.
-    """ 
+    """
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
@@ -121,14 +134,14 @@ def train(args):
     config = load_yaml(args.config_path)
     print("Training config: \n")
     pprint.pprint(config)
-    
+
     if config is None:
         raise ValueError(f"Failed to load config file: {args.config_path}")
-    
+
     # Config params
-    dataset_config = config['dataset_params']
-    tsd_config = config['tsd_params']
-    train_config = config['train_params']
+    dataset_config = config["dataset_params"]
+    tsd_config = config["tsd_params"]
+    train_config = config["train_params"]
 
     # # Sets the desired seed value
     # seed = train_config['seed']
@@ -138,34 +151,41 @@ def train(args):
     # if device == 'cuda':
     #     torch.cuda.manual_seed_all(seed)
 
-    # model = TSD_Classifier(args.num_classes, tsd_config["emb_dim"], 
+    # model = TSD_Classifier(args.num_classes, tsd_config["emb_dim"],
     #                        tsd_config["num_heads_tiny"], tsd_config["num_encoder_layers_tiny"],
     #                        tsd_config["expansion_ratio"], tsd_config["cte_output_channels"])
-    
+
     # Using TSD-B (TSD-Big)
-    model = TSD_Classifier(args.num_classes, tsd_config["emb_dim"], 
-                           tsd_config["num_heads_big"], tsd_config["num_encoder_layers_big"],
-                           tsd_config["expansion_ratio"], tsd_config["cte_output_channels"])
-    
+    model = TSD_Classifier(
+        args.num_classes,
+        tsd_config["emb_dim"],
+        tsd_config["num_heads_big"],
+        tsd_config["num_encoder_layers_big"],
+        tsd_config["expansion_ratio"],
+        tsd_config["cte_output_channels"],
+    )
+
     model = model.to(device)
     print(f"Num_parameters : {count_parameters(model)}M")
     if train_config.get("compile_model", True):
         model = torch.compile(model, mode="reduce-overhead")
-    
+
     train_dataset, val_dataset = prepare_cifar10_dataset(dataset_config)
 
     best_perf = 0.0
     begin_epoch = train_config["begin_train_epoch"]
     num_epochs = train_config["train_epochs"]
     optimizer = build_optimizer(train_config, model)
-    
+
     # Resumes training from a checkpoint
     checkpoint_dir = train_config["checkpoint_dir"]
     checkpoint_save_path = os.path.join(checkpoint_dir, "latest")
     best_model_path = os.path.join(checkpoint_dir, "best")
 
-    best_perf, begin_epoch = resume_checkpoint(model, optimizer, train_config, checkpoint_save_path)
-    
+    best_perf, begin_epoch = resume_checkpoint(
+        model, optimizer, train_config, checkpoint_save_path
+    )
+
     # Builds dataloaders, criterion and scheduler
     train_loader = build_dataloader(train_dataset, train_config, is_train=True)
     val_loader = build_dataloader(val_dataset, train_config, is_train=False)
@@ -173,33 +193,38 @@ def train(args):
     lr_scheduler = build_lr_scheduler(train_config, optimizer, begin_epoch)
 
     scaler = GradScaler(device.type, enabled=train_config["amp_enabled"])
-    
+
     print("Start of training...")
     for epoch in range(begin_epoch, num_epochs):
-        start_time  = time.time()
-        train_one_epoch(train_config, train_loader, model, criterion,
-                        optimizer, epoch, scaler)
+        start_time = time.time()
+        train_one_epoch(
+            train_config, train_loader, model, criterion, optimizer, epoch, scaler
+        )
         print(f"End of training epoch {epoch}.Took {(time.time() - start_time):.3f}s")
-        
+
         print("Starting validation...")
         val_loss, acc = validate_model(val_loader, device, model, criterion)
-        
+
         if acc > best_perf:
             best_perf = acc
             save_best_model(model, best_model_path)
 
         print(f"Current epoch acc: {acc:.3f}, Best acc: {best_perf:.3f}")
-        
+
         step_scheduler(lr_scheduler, val_loss)
 
         save_checkpoint(model, optimizer, checkpoint_save_path, epoch, best_perf)
-              
+
     print("End of training...")
-        
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Arguments for TSD classifier training')
-    parser.add_argument('--config', dest='config_path',
-                        default='config/config.yaml', type=str)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Arguments for TSD classifier training"
+    )
+    parser.add_argument(
+        "--config", dest="config_path", default="config/config.yaml", type=str
+    )
     parser.add_argument("--num_classes", default=2, type=int)
     args = parser.parse_args()
     train(args)

@@ -1,12 +1,13 @@
-import torch
-from torch import nn
-import yaml
-import os
-import torch.optim as optim
-from torch.utils.data import random_split, Subset
 import json
+import os
 import time
+
 import numpy as np
+import torch
+import torch.optim as optim
+import yaml
+from torch import nn
+from torch.utils.data import Subset, random_split
 
 
 def _make_divisible(v, divisor, min_value=None):
@@ -24,6 +25,7 @@ def _make_divisible(v, divisor, min_value=None):
         new_v += divisor
     return new_v
 
+
 def load_yaml(path):
     """
     Loads a YAML file from the given path.
@@ -35,13 +37,14 @@ def load_yaml(path):
         dict or None: Parsed YAML contents, or None if loading fails.
     """
     try:
-        with open(path, 'r') as file:
+        with open(path, "r") as file:
             return yaml.safe_load(file)
     except FileNotFoundError:
         print(f"File not found: {path}")
     except yaml.YAMLError as exc:
         print(f"YAML error: {exc}")
     return None
+
 
 def count_parameters(model):
     """
@@ -54,7 +57,8 @@ def count_parameters(model):
         float: Number of parameters (in millions).
     """
     params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    return params/1000000
+    return params / 1000000
+
 
 def resume_checkpoint(model, optimizer, config, output_dir):
     """
@@ -65,31 +69,32 @@ def resume_checkpoint(model, optimizer, config, output_dir):
         optimizer (torch.optim.Optimizer): Optimizer to restore.
         config (dict): Configuration dictionary.
         output_dir (str): Directory containing the checkpoint.
-        which(str) : Resume training from latest or best checkpoint. 
+        which(str) : Resume training from latest or best checkpoint.
 
     Returns:
         tuple: (best_perf, begin_epoch)
     """
     best_perf = 0.0
     begin_epoch = 0
-   
+
     if not config["TRAIN_CHECKPOINT"]:
-        checkpoint = os.path.join(output_dir, 'checkpoint.pth')
+        checkpoint = os.path.join(output_dir, "checkpoint.pth")
     else:
         checkpoint = config["TRAIN_CHECKPOINT"]
-        
+
     print(f"Looking for a checkpoint at {checkpoint} ...")
 
     if config["AUTO_RESUME"] and os.path.exists(checkpoint):
-        checkpoint_dict = torch.load(checkpoint, map_location='cpu')
-        best_perf = checkpoint_dict['perf']
-        begin_epoch = checkpoint_dict['epoch']
-        state_dict = checkpoint_dict['state_dict']
+        checkpoint_dict = torch.load(checkpoint, map_location="cpu")
+        best_perf = checkpoint_dict["perf"]
+        begin_epoch = checkpoint_dict["epoch"]
+        state_dict = checkpoint_dict["state_dict"]
         model.load_state_dict(state_dict)
 
-        optimizer.load_state_dict(checkpoint_dict['optimizer'])
-    
+        optimizer.load_state_dict(checkpoint_dict["optimizer"])
+
     return best_perf, begin_epoch
+
 
 def save_checkpoint(model, optimizer, output_dir, epoch_num, best_perf):
     """
@@ -103,19 +108,20 @@ def save_checkpoint(model, optimizer, output_dir, epoch_num, best_perf):
         best_perf (float): Best performance metric so far.
     """
     save_dict = {
-        'epoch': epoch_num,
-        'state_dict': model.state_dict(),
-        'perf': best_perf,
-        'optimizer': optimizer.state_dict(),
+        "epoch": epoch_num,
+        "state_dict": model.state_dict(),
+        "perf": best_perf,
+        "optimizer": optimizer.state_dict(),
     }
 
-    checkpoint_path = os.path.join(output_dir, 'checkpoint.pth')
+    checkpoint_path = os.path.join(output_dir, "checkpoint.pth")
 
     try:
         torch.save(save_dict, checkpoint_path)
         print(f"=> Checkpoint saved at epoch {epoch_num} to '{checkpoint_path}'")
     except Exception as e:
         print(f"Error saving checkpoint: {e}")
+
 
 def save_best_model(model, output_dir):
     """
@@ -126,10 +132,11 @@ def save_best_model(model, output_dir):
         output_dir (str): Directory to save the model.
     """
     try:
-        torch.save(model.state_dict(), os.path.join(output_dir, 'best_model.pth'))
+        torch.save(model.state_dict(), os.path.join(output_dir, "best_model.pth"))
         print("=> Best model updated.")
     except Exception as e:
         print(f"Error saving best model: {e}")
+
 
 def build_dataloader(dataset, config, is_train):
     """
@@ -147,17 +154,18 @@ def build_dataloader(dataset, config, is_train):
     required_keys = ["train_batch_size", "val_batch_size", "num_workers", "pin_memory"]
     for key in required_keys:
         assert key in config, f"Missing key in config: {key}"
-    
+
     data_loader = torch.utils.data.DataLoader(
-            dataset,
-            batch_size = config["train_batch_size"] if is_train else config["val_batch_size"],
-            shuffle=is_train,
-            num_workers=config["num_workers"],
-            pin_memory=config["pin_memory"],
-            drop_last=is_train,
-        )
+        dataset,
+        batch_size=config["train_batch_size"] if is_train else config["val_batch_size"],
+        shuffle=is_train,
+        num_workers=config["num_workers"],
+        pin_memory=config["pin_memory"],
+        drop_last=is_train,
+    )
 
     return data_loader
+
 
 def _is_depthwise(module):
     """
@@ -172,11 +180,12 @@ def _is_depthwise(module):
     Returns:
         bool: True if the module is a depthwise Conv2d layer, False otherwise.
     """
-    return(
+    return (
         isinstance(module, nn.Conv2d)
         and module.groups == module.in_channels
         and module.groups == module.out_channels
     )
+
 
 def set_decay(config, model):
     """
@@ -196,22 +205,22 @@ def set_decay(config, model):
     """
     without_decay_list = config["TRAIN_WITHOUT_WD"]
     without_decay = set()
-    
+
     # Adds the following modules to the without_decay set
     for m in model.modules():
-        if _is_depthwise(m) and 'dw' in without_decay_list:
+        if _is_depthwise(m) and "dw" in without_decay_list:
             without_decay.add(m.weight)
-        elif isinstance(m, nn.BatchNorm2d) and 'bn' in without_decay_list:
+        elif isinstance(m, nn.BatchNorm2d) and "bn" in without_decay_list:
             without_decay.update([m.weight, m.bias])
-        elif isinstance(m, nn.GroupNorm) and 'gn' in without_decay_list:
+        elif isinstance(m, nn.GroupNorm) and "gn" in without_decay_list:
             without_decay.update([m.weight, m.bias])
-        elif isinstance(m, nn.LayerNorm) and 'ln' in without_decay_list:
+        elif isinstance(m, nn.LayerNorm) and "ln" in without_decay_list:
             without_decay.update([m.weight, m.bias])
-    
+
     # Adds named parameters ending with .bias to the without_decay set
-    if 'bias' in config["TRAIN_WITHOUT_WD"]:
+    if "bias" in config["TRAIN_WITHOUT_WD"]:
         for name, param in model.named_parameters():
-            if name.endswith('.bias'):
+            if name.endswith(".bias"):
                 without_decay.add(param)
 
     params_with_decay = []
@@ -226,9 +235,10 @@ def set_decay(config, model):
             params_with_decay.append(param)
 
     return [
-        {'params': params_with_decay},
-        {'params': params_without_decay, 'weight_decay': 0.0}
+        {"params": params_with_decay},
+        {"params": params_without_decay, "weight_decay": 0.0},
     ]
+
 
 def build_optimizer(config, model):
     """
@@ -247,7 +257,7 @@ def build_optimizer(config, model):
     """
     optimizer = None
     params = set_decay(config, model)
-    
+
     if config["optimizer_name"] == "Adam":
         optimizer = optim.Adam(
             params,
@@ -262,13 +272,15 @@ def build_optimizer(config, model):
         )
     else:
         raise ValueError(f"Unknown optimizer name {config['optimizer_name']}")
-    
+
     return optimizer
 
+
 def build_criterion():
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     criterion = nn.CrossEntropyLoss().to(device)
     return criterion
+
 
 def build_lr_scheduler(config, optimizer, begin_epoch):
     """
@@ -292,14 +304,11 @@ def build_lr_scheduler(config, optimizer, begin_epoch):
     lr_scheduler = None
     if config["lr_scheduler_name"] == "CosineAnnealing":
         lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(
-            optimizer,
-            config["train_epochs"],
-            float(config["eta_min"]),
-            begin_epoch - 1
+            optimizer, config["train_epochs"], float(config["eta_min"]), begin_epoch - 1
         )
     elif config["lr_scheduler_name"] == "ReduceLROnPlateau":
         lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, 
+            optimizer,
             mode="min",
             factor=config["reduce_lr_factor"],
             patience=config["patience_epochs"],
@@ -307,8 +316,9 @@ def build_lr_scheduler(config, optimizer, begin_epoch):
         )
     else:
         raise ValueError(f"Unknown lr_scheduler {config['lr_scheduler_name']}")
-    
+
     return lr_scheduler
+
 
 def step_scheduler(scheduler, val_loss=None):
     """
@@ -318,9 +328,9 @@ def step_scheduler(scheduler, val_loss=None):
     - For other schedulers (like CosineAnnealingLR), `step()` is called without arguments.
 
     Args:
-        scheduler (torch.optim.lr_scheduler._LRScheduler or ReduceLROnPlateau): 
+        scheduler (torch.optim.lr_scheduler._LRScheduler or ReduceLROnPlateau):
             The learning rate scheduler to step.
-        val_loss (float, optional): 
+        val_loss (float, optional):
             Validation loss to pass to ReduceLROnPlateau. Required if scheduler is of that type.
 
     Raises:
@@ -331,7 +341,8 @@ def step_scheduler(scheduler, val_loss=None):
         assert val_loss is not None, "val_loss required for ReduceLROnPlateau"
         scheduler.step(val_loss)
     else:
-        scheduler.step()    
+        scheduler.step()
+
 
 class AverageMeter(object):
     """
@@ -339,7 +350,9 @@ class AverageMeter(object):
 
     Useful during training or evaluation to maintain running averages over time.
     """
+
     """Computes and stores the average and current value"""
+
     def __init__(self):
         self.reset()
 
@@ -355,6 +368,7 @@ class AverageMeter(object):
         self.count += n
         self.avg = self.sum / self.count
 
+
 def compute_accuracy(preds: torch.Tensor, targets: torch.Tensor) -> float:
     """
     Computes the fraction of correct predictions in a batch.
@@ -368,10 +382,11 @@ def compute_accuracy(preds: torch.Tensor, targets: torch.Tensor) -> float:
     """
     # Argmax to be used in case of multi-class classification
     predicted_labels = torch.argmax(preds, dim=1)
-    
+
     correct = (predicted_labels == targets).sum().item()
     total = targets.size(0)
     return correct / total
+
 
 @torch.no_grad()
 def validate_model(val_loader, device, model, criterion, amp_enabled=True):
@@ -391,8 +406,5 @@ def validate_model(val_loader, device, model, criterion, amp_enabled=True):
         acc = compute_accuracy(outputs, y)
         accuracy.update(acc, x.size(0))
 
-    print(
-        f"Avg Loss: {losses.avg:.3f}\n"
-        f"Validation Accuracy: {accuracy.avg:.3f}"
-    )
+    print(f"Avg Loss: {losses.avg:.3f}\n" f"Validation Accuracy: {accuracy.avg:.3f}")
     return losses.avg, accuracy.avg

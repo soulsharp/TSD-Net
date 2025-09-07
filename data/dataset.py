@@ -1,11 +1,11 @@
-import torch.utils.data as data
 import os
-from PIL import Image, ImageTransform
-from torchvision.transforms import InterpolationMode
-import torchvision
-from torchvision import transforms as T
 
 import torch
+import torch.utils.data as data
+import torchvision
+from PIL import Image, ImageTransform
+from torchvision import transforms as T
+from torchvision.transforms import InterpolationMode
 
 
 def build_transforms(cfg, is_train=True):
@@ -55,7 +55,7 @@ def build_transforms(cfg, is_train=True):
     #         T.ToTensor(),
     #         normalize,
     #     ])
-    
+
     # else:
     #     transforms = T.Compose([
     #         T.Resize(
@@ -65,22 +65,22 @@ def build_transforms(cfg, is_train=True):
     #         T.ToTensor(),
     #         normalize
     #         ])
-    
+
     # Testing different augmentations
     if is_train:
-        transforms = T.Compose([
-        T.RandomCrop(32, padding=4),
-        T.RandomHorizontalFlip(),
-        T.ToTensor(),
-        normalize,
-    ])
+        transforms = T.Compose(
+            [
+                T.RandomCrop(32, padding=4),
+                T.RandomHorizontalFlip(),
+                T.ToTensor(),
+                normalize,
+            ]
+        )
     else:
-        transforms = T.Compose([
-        T.ToTensor(),
-        normalize
-        ])
+        transforms = T.Compose([T.ToTensor(), normalize])
 
     return transforms
+
 
 def prepare_cifar10_dataset(cfg):
     """
