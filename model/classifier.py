@@ -41,7 +41,8 @@ class TSD_Classifier(nn.Module):
         # self.backbone = TSD_T(dim, cte_out_channels, num_heads, num_encoder_layers, expansion_ratio)
 
         self.backbone = TSD_B(
-            dim, cte_out_channels, num_heads, num_encoder_layers, expansion_ratio)
+            dim, cte_out_channels, num_heads, num_encoder_layers, expansion_ratio
+        )
         self.pool = nn.AdaptiveAvgPool1d(1)
         if num_classes > 2:
             self.classifier = Mlp(
