@@ -60,7 +60,7 @@ def count_parameters(model):
     return params / 1000000
 
 
-def resume_checkpoint(model, optimizer, config, output_dir):
+def resume_checkpoint(model, optimizer, lr_scheduler, config, output_dir):
     """
     Loads model and optimizer state from a checkpoint, if available.
 
@@ -90,14 +90,15 @@ def resume_checkpoint(model, optimizer, config, output_dir):
         best_perf = checkpoint_dict["perf"]
         begin_epoch = checkpoint_dict["epoch"]
         state_dict = checkpoint_dict["state_dict"]
-        model.load_state_dict(state_dict)
 
+        model.load_state_dict(state_dict)
         optimizer.load_state_dict(checkpoint_dict["optimizer"])
+        lr_scheduler.load_state_dict(checkpoint_dict["scheduler"])
 
     return best_perf, begin_epoch
 
 
-def save_checkpoint(model, optimizer, output_dir, epoch_num, best_perf):
+def save_checkpoint(model, optimizer, lr_scheduler, output_dir, epoch_num, best_perf):
     """
     Saves a checkpoint of the model and optimizer.
 
@@ -112,7 +113,8 @@ def save_checkpoint(model, optimizer, output_dir, epoch_num, best_perf):
         "epoch": epoch_num,
         "state_dict": model.state_dict(),
         "perf": best_perf,
-        "optimizer": optimizer.state_dict()
+        "optimizer": optimizer.state_dict(),
+        "scheduler": lr_scheduler.state_dict(),
     }
 
     checkpoint_path = os.path.join(output_dir, "checkpoint.pth")
@@ -283,7 +285,7 @@ def build_criterion():
     return criterion
 
 
-def build_lr_scheduler(config, optimizer, begin_epoch, prev_best=None):
+def build_lr_scheduler(config, optimizer, begin_epoch):
     """
     Builds and returns a learning rate scheduler based on the specified configuration.
 
@@ -387,6 +389,7 @@ def compute_accuracy(preds: torch.Tensor, targets: torch.Tensor) -> float:
     correct = (predicted_labels == targets).sum().item()
     total = targets.size(0)
     return correct / total
+
 
 def get_topk_accuracy(logits, labels, k):
     """

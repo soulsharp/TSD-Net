@@ -174,6 +174,7 @@ def train(args):
     best_perf = 0.0
     begin_epoch = train_config["begin_train_epoch"]
     optimizer = build_optimizer(train_config, model)
+    lr_scheduler = build_lr_scheduler(train_config, optimizer, begin_epoch)
 
     # Resumes training from a checkpoint
     checkpoint_dir = train_config["checkpoint_dir"]
@@ -181,7 +182,7 @@ def train(args):
     best_model_path = os.path.join(checkpoint_dir, "best")
 
     best_perf, begin_epoch = resume_checkpoint(
-        model, optimizer, train_config, checkpoint_save_path
+        model, optimizer, lr_scheduler, train_config, checkpoint_save_path
     )
 
     num_epochs = train_config["train_epochs"] + begin_epoch
@@ -190,7 +191,6 @@ def train(args):
     train_loader = build_dataloader(train_dataset, train_config, is_train=True)
     val_loader = build_dataloader(val_dataset, train_config, is_train=False)
     criterion = build_criterion().to(device)
-    lr_scheduler = build_lr_scheduler(train_config, optimizer, begin_epoch)
 
     scaler = GradScaler(device.type, enabled=train_config["amp_enabled"])
 
@@ -209,11 +209,15 @@ def train(args):
             best_perf = acc
             save_best_model(model, best_model_path)
 
-        print(f"Current validation epoch acc: {acc:.3f}, Best validation acc: {best_perf:.3f}")
+        print(
+            f"Current validation epoch acc: {acc:.3f}, Best validation acc: {best_perf:.3f}"
+        )
 
         step_scheduler(lr_scheduler, val_loss)
 
-        save_checkpoint(model, optimizer, checkpoint_save_path, epoch, best_perf)
+        save_checkpoint(
+            model, optimizer, lr_scheduler, checkpoint_save_path, epoch, best_perf
+        )
 
     print("End of training...")
 
