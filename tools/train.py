@@ -70,8 +70,7 @@ def train_one_epoch(config, train_loader, model, criterion, optimizer, epoch, sc
         y = targets.to(device)
 
         with torch.autocast(device.type, enabled=config["amp_enabled"]):
-            # In multi-class classification return_logits is to be set to False
-            out = model(x, return_logits=False)
+            out = model(x, return_logits=True)
             loss = criterion(out, y)
 
         optimizer.zero_grad()
@@ -174,7 +173,6 @@ def train(args):
 
     best_perf = 0.0
     begin_epoch = train_config["begin_train_epoch"]
-    num_epochs = train_config["train_epochs"]
     optimizer = build_optimizer(train_config, model)
 
     # Resumes training from a checkpoint
@@ -185,6 +183,8 @@ def train(args):
     best_perf, begin_epoch = resume_checkpoint(
         model, optimizer, train_config, checkpoint_save_path
     )
+
+    num_epochs = train_config["train_epochs"] + begin_epoch
 
     # Builds dataloaders, criterion and scheduler
     train_loader = build_dataloader(train_dataset, train_config, is_train=True)
@@ -209,7 +209,7 @@ def train(args):
             best_perf = acc
             save_best_model(model, best_model_path)
 
-        print(f"Current epoch acc: {acc:.3f}, Best acc: {best_perf:.3f}")
+        print(f"Current validation epoch acc: {acc:.3f}, Best validation acc: {best_perf:.3f}")
 
         step_scheduler(lr_scheduler, val_loss)
 
