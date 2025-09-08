@@ -78,14 +78,15 @@ def resume_checkpoint(model, optimizer, config, output_dir):
     begin_epoch = 0
 
     if not config["TRAIN_CHECKPOINT"]:
-        checkpoint = os.path.join(output_dir, "checkpoint.pth")
+        checkpoint_path = os.path.join(output_dir, "checkpoint.pth")
     else:
-        checkpoint = config["TRAIN_CHECKPOINT"]
+        checkpoint_path = config["TRAIN_CHECKPOINT"]
 
-    print(f"Looking for a checkpoint at {checkpoint} ...")
+    print(f"Looking for a checkpoint at {checkpoint_path} ...")
 
-    if config["AUTO_RESUME"] and os.path.exists(checkpoint):
-        checkpoint_dict = torch.load(checkpoint, map_location="cpu")
+    if config["AUTO_RESUME"] and os.path.exists(checkpoint_path):
+        print(f"Found checkpoint at {checkpoint_path}")
+        checkpoint_dict = torch.load(checkpoint_path, map_location="cpu")
         best_perf = checkpoint_dict["perf"]
         begin_epoch = checkpoint_dict["epoch"]
         state_dict = checkpoint_dict["state_dict"]
@@ -111,7 +112,7 @@ def save_checkpoint(model, optimizer, output_dir, epoch_num, best_perf):
         "epoch": epoch_num,
         "state_dict": model.state_dict(),
         "perf": best_perf,
-        "optimizer": optimizer.state_dict(),
+        "optimizer": optimizer.state_dict()
     }
 
     checkpoint_path = os.path.join(output_dir, "checkpoint.pth")
@@ -123,16 +124,16 @@ def save_checkpoint(model, optimizer, output_dir, epoch_num, best_perf):
         print(f"Error saving checkpoint: {e}")
 
 
-def save_best_model(model, output_dir):
+def save_best_model(model, save_dir):
     """
     Saves the model weights as the best-performing model.
 
     Args:
         model (torch.nn.Module): Model to save.
-        output_dir (str): Directory to save the model.
+        save_dir (str): Directory to save the model.
     """
     try:
-        torch.save(model.state_dict(), os.path.join(output_dir, "best_model.pth"))
+        torch.save(model.state_dict(), os.path.join(save_dir, "best_model.pth"))
         print("=> Best model updated.")
     except Exception as e:
         print(f"Error saving best model: {e}")
@@ -278,11 +279,11 @@ def build_optimizer(config, model):
 
 def build_criterion():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    criterion = nn.CrossEntropyLoss().to(device)
+    criterion = nn.CrossEntropyLoss(label_smoothing=0.125).to(device)
     return criterion
 
 
-def build_lr_scheduler(config, optimizer, begin_epoch):
+def build_lr_scheduler(config, optimizer, begin_epoch, prev_best=None):
     """
     Builds and returns a learning rate scheduler based on the specified configuration.
 
@@ -387,9 +388,38 @@ def compute_accuracy(preds: torch.Tensor, targets: torch.Tensor) -> float:
     total = targets.size(0)
     return correct / total
 
+def get_topk_accuracy(logits, labels, k):
+    """
+    Computes the Top-K classification accuracy.
+
+    Args:
+        logits (torch.Tensor): Model output logits of shape (batch_size, num_classes).
+        labels (torch.Tensor): Ground truth class labels of shape (batch_size,).
+        k (int): The number of top predictions to consider (Top-K).
+
+    Returns:
+        float: Top-K accuracy as a fraction between 0 and 1.
+    """
+    assert (
+        isinstance(logits, torch.Tensor) and logits.ndim == 2
+    ), "Logits must be 2-dimensional tensors"
+    assert (
+        isinstance(labels, torch.Tensor) and labels.ndim == 1
+    ), "Labels must be 1-dimensional tensors"
+    assert isinstance(k, int) and k > 0, "K must be an integer greater than 0"
+
+    # Top-k indices along classes
+    topk_preds = torch.topk(logits, k, dim=1).indices
+    labels = labels.view(-1, 1).expand_as(topk_preds)
+
+    correct = (topk_preds == labels).any(dim=1).sum().item()
+    total = labels.size(0)
+
+    return correct / total
+
 
 @torch.no_grad()
-def validate_model(val_loader, device, model, criterion, amp_enabled=True):
+def validate_model(val_loader, device, model, criterion, k=3, amp_enabled=True):
     model.eval()
     losses = AverageMeter()
     accuracy = AverageMeter()
@@ -403,7 +433,7 @@ def validate_model(val_loader, device, model, criterion, amp_enabled=True):
             loss = criterion(outputs, y)
 
         losses.update(loss.item(), x.size(0))
-        acc = compute_accuracy(outputs, y)
+        acc = get_topk_accuracy(outputs, y, k)
         accuracy.update(acc, x.size(0))
 
     print(f"Avg Loss: {losses.avg:.3f}\n" f"Validation Accuracy: {accuracy.avg:.3f}")
