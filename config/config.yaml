@@ -35,7 +35,7 @@ train_params:
   TRAIN_WITHOUT_WD : ['dw', 'bn', 'ln', 'bias'] # List of Layer names whose weight should not be decayed in AdamW 
   pin_memory : True
   num_workers : 2
-  amp_enabled :  True
+  amp_enabled :  False
   clip_grad_norm : 1.0
   compile_model : True
 
